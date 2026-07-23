@@ -899,25 +899,28 @@ table.pkg tfoot td { padding: 18px; border-bottom: 0; }
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
-  padding: 10px 14px;
+  padding: 8px 28px 8px 12px;
   display: none;
   align-items: center;
-  gap: 12px;
+  gap: 6px 8px;
   flex-wrap: wrap;
   max-width: 620px;
   margin-inline: auto;
   font-size: 13px;
 }
 .cookie.is-open { display: flex; }
-.cookie p { flex: 1 1 260px; margin: 0; color: var(--gray); }
+.cookie p { flex: 1 1 auto; min-width: 0; margin: 0; color: var(--gray); line-height: 1.35; white-space: normal; }
 .cookie a { color: var(--navy); border-bottom: 1px solid var(--gold); }
+.cookie .btn { width: auto; padding: 6px 14px; font-size: 13px; }
 .cookie__close {
+  position: absolute;
+  top: 6px;
+  inset-inline-end: 8px;
   background: transparent;
   border: 0;
   padding: 2px 4px;
-  margin-inline-start: 2px;
   color: var(--gray);
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1;
   cursor: pointer;
 }
@@ -956,7 +959,7 @@ table.pkg tfoot td { padding: 18px; border-bottom: 0; }
   .fault-grid { grid-template-columns: 1fr; }
   .floating { display: none; }
   .mobile-bar {
-    display: grid;
+    display: none;
     grid-template-columns: 1fr 1fr;
     position: fixed;
     inset-inline: 0;
@@ -966,6 +969,7 @@ table.pkg tfoot td { padding: 18px; border-bottom: 0; }
     border-top: 1px solid var(--line);
     box-shadow: 0 -4px 20px rgba(16,38,57,.1);
   }
+  .mobile-bar.is-visible { display: grid; }
   .mobile-bar a {
     padding: 15px 10px;
     text-align: center;

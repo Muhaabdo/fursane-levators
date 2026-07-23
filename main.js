@@ -8,12 +8,12 @@ const CONFIG = {
   /* رقم الجوال بصيغة دولية بدون + وبدون مسافات */
   phone: '966507919933',
 
-  /* 🔸 رابط خدمة إرسال النموذج للإيميل (Formspree / Web3Forms / FormSubmit).
+  /* رابط Google Apps Script (Web App) — بيستقبل بيانات النماذج ويسجّلها في الشيت.
      اتركه فارغًا وسيتحوّل النموذج تلقائيًا لإرسال البيانات عبر واتساب. */
-  formEndpoint: 'https://formsubmit.co/ajax/topnotchrealstate20@gmail.com',
+  formEndpoint: 'https://script.google.com/macros/s/AKfycbzQLmctCixXqvCrH2a3r65XdqCjy4caw5aGz0xzu9mOmL8DmZor0Xx83YcipYwucQdk/exec',
 
-  /* اسم حقل الخدمة الذي يستقبل الإيميل — يختلف حسب المزود */
-  endpointType: 'json', // 'json' أو 'formdata'
+  /* 'sheet' (Google Apps Script) — النوع الحالي. 'json' أو 'formdata' لخدمات تانية لو احتجناها. */
+  endpointType: 'sheet',
 };
 
 /* ==========================================================================
@@ -44,7 +44,16 @@ function getCookie(name) {
 }
 
 /* ==========================================================================
-   2. تتبع النقرات (اتصال / واتساب)
+   2. التقاط GCLID (نقرة إعلانات جوجل) — لربط الطلب بالحملة اللي جابته
+   ========================================================================== */
+
+(function captureGclid() {
+  const gclid = new URLSearchParams(location.search).get('gclid');
+  if (gclid) setCookie('fursan_gclid', gclid, 90);
+})();
+
+/* ==========================================================================
+   3. تتبع النقرات (اتصال / واتساب)
    ========================================================================== */
 
 document.addEventListener('click', (e) => {
@@ -73,7 +82,7 @@ $$('[data-service-link]').forEach(el => {
 });
 
 /* ==========================================================================
-   3. القائمة على الموبايل
+   4. القائمة على الموبايل
    ========================================================================== */
 
 const header = $('.header');
@@ -92,7 +101,7 @@ if (burger && header) {
 }
 
 /* ==========================================================================
-   4. مؤشر البئر — العنصر المميز
+   5. مؤشر البئر — العنصر المميز
    ========================================================================== */
 
 (function shaftIndicator() {
@@ -135,7 +144,7 @@ if (burger && header) {
 })();
 
 /* ==========================================================================
-   5. ظهور الأقسام عند التمرير
+   6. ظهور الأقسام عند التمرير
    ========================================================================== */
 
 (function revealOnScroll() {
@@ -157,7 +166,7 @@ if (burger && header) {
 })();
 
 /* ==========================================================================
-   6. النماذج
+   7. النماذج
    ========================================================================== */
 
 /* تحقق من رقم الجوال السعودي وإرجاعه بصيغة موحّدة */
@@ -219,6 +228,9 @@ $$('form[data-form]').forEach(form => {
     const data = Object.fromEntries(new FormData(form).entries());
     data.phone_normalized = normalizePhone(data.phone || '') || '';
     data.page = document.body.dataset.page || '';
+    data.page_label = document.body.dataset.pageName || '';
+    data.page_url = window.location.href;
+    data.gclid = getCookie('fursan_gclid') || '';
 
     const finish = () => {
       track(form.dataset.form, { page: data.page, city: data.city || '' });
@@ -234,7 +246,11 @@ $$('form[data-form]').forEach(form => {
 
     try {
       const opts = { method: 'POST' };
-      if (CONFIG.endpointType === 'json') {
+      if (CONFIG.endpointType === 'sheet') {
+        /* Content-Type نصي بسيط عشان نتفادى CORS preflight مع Google Apps Script */
+        opts.headers = { 'Content-Type': 'text/plain;charset=utf-8' };
+        opts.body = JSON.stringify(data);
+      } else if (CONFIG.endpointType === 'json') {
         opts.headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
         opts.body = JSON.stringify(data);
       } else {
@@ -257,7 +273,7 @@ $$('form[data-form]').forEach(form => {
 });
 
 /* ==========================================================================
-   7. شريط الكوكيز
+   8. شريط الكوكيز
    ========================================================================== */
 
 (function cookieBar() {
@@ -266,11 +282,19 @@ $$('form[data-form]').forEach(form => {
   if (getCookie('fursan_consent') === 'yes') return;
 
   let autoHideTimer;
+  let io;
+
   const dismiss = (eventName) => {
     clearTimeout(autoHideTimer);
+    io?.disconnect();
     setCookie('fursan_consent', 'yes', 180);
     bar.classList.remove('is-open');
     if (eventName) track(eventName);
+  };
+
+  const hide = () => {
+    clearTimeout(autoHideTimer);
+    bar.classList.remove('is-open');
   };
 
   const show = () => {
@@ -281,16 +305,15 @@ $$('form[data-form]').forEach(form => {
   $('[data-cookie-accept]', bar)?.addEventListener('click', () => dismiss('cookie_consent_granted'));
   $('[data-cookie-close]', bar)?.addEventListener('click', () => dismiss('notice_closed'));
 
-  /* تُعرض بعد تجاوز الهيرو فقط، عشان ما تغطّيش على أزرار الدعوة لإجراء فيه */
+  /* تُعرض بعد تجاوز الهيرو، وتختفي تاني لو المستخدم رجع يشوفه —
+     عشان ما تغطّيش على أزرار الدعوة لإجراء فيه في أي وقت */
   const hero = $('.hero');
   if (!hero || !('IntersectionObserver' in window)) { show(); return; }
 
-  const io = new IntersectionObserver((entries) => {
+  io = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
-      if (!entry.isIntersecting && entry.boundingClientRect.top < 0) {
-        io.unobserve(hero);
-        show();
-      }
+      if (entry.isIntersecting) hide();
+      else if (entry.boundingClientRect.top < 0) show();
     });
   }, { threshold: 0 });
 
@@ -298,7 +321,25 @@ $$('form[data-form]').forEach(form => {
 })();
 
 /* ==========================================================================
-   8. زر الرجوع للصفحة السابقة (صفحة الشكر)
+   9. شريط الجوال السفلي — يظهر بعد تجاوز الهيرو، عشان ما يغطّيش أزرار الهيرو
+   ========================================================================== */
+
+(function mobileBar() {
+  const bar = $('.mobile-bar');
+  const hero = $('.hero');
+  if (!bar || !hero || !('IntersectionObserver' in window)) return;
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      bar.classList.toggle('is-visible', !entry.isIntersecting && entry.boundingClientRect.top < 0);
+    });
+  }, { threshold: 0 });
+
+  io.observe(hero);
+})();
+
+/* ==========================================================================
+   10. زر الرجوع للصفحة السابقة (صفحة الشكر)
    ========================================================================== */
 
 $('[data-back-link]')?.addEventListener('click', (e) => {
