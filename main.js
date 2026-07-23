@@ -6,11 +6,11 @@
 
 const CONFIG = {
   /* رقم الجوال بصيغة دولية بدون + وبدون مسافات */
-  phone: '966536600095',
+  phone: '966507919933',
 
   /* 🔸 رابط خدمة إرسال النموذج للإيميل (Formspree / Web3Forms / FormSubmit).
      اتركه فارغًا وسيتحوّل النموذج تلقائيًا لإرسال البيانات عبر واتساب. */
-  formEndpoint: '',
+  formEndpoint: 'https://formsubmit.co/ajax/topnotchrealstate20@gmail.com',
 
   /* اسم حقل الخدمة الذي يستقبل الإيميل — يختلف حسب المزود */
   endpointType: 'json', // 'json' أو 'formdata'
@@ -214,7 +214,6 @@ $$('form[data-form]').forEach(form => {
     if (!validate(form)) return;
 
     const btn = $('[type="submit"]', form);
-    const original = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.textContent = 'جارٍ الإرسال…'; }
 
     const data = Object.fromEntries(new FormData(form).entries());
@@ -223,9 +222,7 @@ $$('form[data-form]').forEach(form => {
 
     const finish = () => {
       track(form.dataset.form, { page: data.page, city: data.city || '' });
-      form.closest('[data-form-wrap]')?.classList.add('is-sent');
-      if (btn) { btn.disabled = false; btn.textContent = original; }
-      form.reset();
+      window.location.href = 'thank-you.html';
     };
 
     /* لا يوجد endpoint → التحويل لواتساب بالبيانات جاهزة */
@@ -268,10 +265,44 @@ $$('form[data-form]').forEach(form => {
   if (!bar) return;
   if (getCookie('fursan_consent') === 'yes') return;
 
-  bar.classList.add('is-open');
-  $('[data-cookie-accept]', bar)?.addEventListener('click', () => {
+  let autoHideTimer;
+  const dismiss = (eventName) => {
+    clearTimeout(autoHideTimer);
     setCookie('fursan_consent', 'yes', 180);
     bar.classList.remove('is-open');
-    track('cookie_consent_granted');
-  });
+    if (eventName) track(eventName);
+  };
+
+  const show = () => {
+    bar.classList.add('is-open');
+    autoHideTimer = setTimeout(() => dismiss('notice_auto_dismissed'), 8000);
+  };
+
+  $('[data-cookie-accept]', bar)?.addEventListener('click', () => dismiss('cookie_consent_granted'));
+  $('[data-cookie-close]', bar)?.addEventListener('click', () => dismiss('notice_closed'));
+
+  /* تُعرض بعد تجاوز الهيرو فقط، عشان ما تغطّيش على أزرار الدعوة لإجراء فيه */
+  const hero = $('.hero');
+  if (!hero || !('IntersectionObserver' in window)) { show(); return; }
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting && entry.boundingClientRect.top < 0) {
+        io.unobserve(hero);
+        show();
+      }
+    });
+  }, { threshold: 0 });
+
+  io.observe(hero);
 })();
+
+/* ==========================================================================
+   8. زر الرجوع للصفحة السابقة (صفحة الشكر)
+   ========================================================================== */
+
+$('[data-back-link]')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  if (window.history.length > 1) window.history.back();
+  else window.location.href = 'index.html';
+});
